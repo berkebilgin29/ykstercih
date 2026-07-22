@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YKS 2026 Tercih & Sıralama Tahmin Portalı</title>
+
+  <!-- Sayfa çizilmeden önce koyu/açık tema kararını verir (flaş/titreme olmasın diye) -->
+  <script>
+    (function () {
+      const saved = localStorage.getItem('yks_theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved ? saved === 'dark' : prefersDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+
+  <!-- Tailwind CSS v3 (Play CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        },
+      },
+    };
+  </script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome ikon seti -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Chart.js (bölüm kartlarındaki mini grafikler ve detay grafiği için) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgb(161 161 170 / 0.4); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgb(113 113 122 / 0.6); }
+
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    .skeleton {
+      background-image: linear-gradient(90deg, rgba(120,120,140,0.10) 25%, rgba(120,120,140,0.22) 37%, rgba(120,120,140,0.10) 63%);
+      background-size: 400% 100%;
+      animation: shimmer 1.4s ease infinite;
+    }
+
+    @keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-slide-up { animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate-fade-in { animation: fadeIn 0.4s ease both; }
+
+    .glass {
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
+
+    .hero-glow {
+      background: radial-gradient(circle at 50% 0%, rgba(99,102,241,0.18), transparent 60%);
+    }
+    .dark .hero-glow {
+      background: radial-gradient(circle at 50% 0%, rgba(99,102,241,0.25), transparent 60%);
+    }
+
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+  </style>
+</head>
+<body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
+
+  <!-- ======================= NAVİGASYON ======================= -->
+  <nav class="sticky top-0 z-30 glass bg-white/70 dark:bg-zinc-950/70 border-b border-zinc-200/70 dark:border-zinc-800/70">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 font-extrabold text-lg tracking-tight">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/30">
+          <i class="fa-solid fa-graduation-cap text-sm"></i>
+        </div>
+        <span>YKS <span class="text-indigo-600 dark:text-indigo-400">2026</span></span>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button
+          id="rankPill"
+          onclick="scrollToRankForm()"
+          class="hidden items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
+        >
+          <i class="fa-solid fa-ranking-star"></i>
+          <span>—</span>
+        </button>
+
+        <button
+          id="themeToggleBtn"
+          class="w-9 h-9 rounded-full flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          title="Temayı değiştir"
+        >
+          <i id="themeIcon" class="fa-solid fa-moon"></i>
+        </button>
+
+        <button
+          onclick="togglePrefDrawer()"
+          class="relative flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full text-sm font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 active:scale-95 transition-all"
+        >
+          <i class="fa-solid fa-list-check"></i>
+          <span class="hidden sm:inline">Tercih Listem</span>
+          <span id="prefCountBadge" class="min-w-[1.25rem] h-5 px-1 rounded-full bg-indigo-500 text-white text-[11px] font-bold flex items-center justify-center">0</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ======================= HERO & SIRALAMA GİRİŞİ ======================= -->
+  <section id="heroSection" class="relative hero-glow overflow-hidden">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 pt-14 pb-16 sm:pt-20 sm:pb-24 text-center">
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800/80 text-zinc-500 dark:text-zinc-400 mb-6 animate-fade-in">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        YÖK Atlas verileriyle güncel · 2026 tahmin motoru
+      </div>
+
+      <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.1] animate-slide-up">
+        Sıralamanı gir,<br>
+        <span class="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 dark:from-indigo-400 dark:via-violet-400 dark:to-fuchsia-400 bg-clip-text text-transparent">
+          2026 tercihini veriyle yap.
+        </span>
+      </h1>
+      <p class="mt-5 text-zinc-500 dark:text-zinc-400 text-base sm:text-lg max-w-xl mx-auto animate-slide-up" style="animation-delay:80ms">
+        TYT + AYT sonucu oluşan YKS başarı sıralamanı gir; geçmiş 3 yılın verisiyle
+        eğitilen tahmin motorumuz sana en uygun bölümleri ve kazanma ihtimalini anında göstersin.
+      </p>
+
+      <!-- Sıralama giriş formu -->
+      <form id="heroRankForm" class="mt-10 max-w-lg mx-auto animate-slide-up" style="animation-delay:160ms">
+        <div class="glass bg-white/80 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl shadow-zinc-900/5 p-2 flex flex-col sm:flex-row items-stretch gap-2">
+          <div class="flex-1 flex items-center gap-2 px-4">
+            <i class="fa-solid fa-ranking-star text-indigo-500"></i>
+            <input
+              id="heroRankInput"
+              type="number"
+              min="1"
+              inputmode="numeric"
+              placeholder="YKS başarı sıralaman (örn: 65000)"
+              class="w-full bg-transparent py-3 text-sm sm:text-base font-medium focus:outline-none placeholder:text-zinc-400"
+            >
+          </div>
+          <button
+            type="submit"
+            class="shrink-0 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold rounded-xl px-6 py-3 text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-indigo-600/25"
+          >
+            <i class="fa-solid fa-wand-magic-sparkles"></i>Analizi Başlat
+          </button>
+        </div>
+      </form>
+
+      <!-- İstatistik sayaçları -->
+      <div class="mt-14 grid grid-cols-3 gap-4 sm:gap-8 max-w-lg mx-auto animate-slide-up" style="animation-delay:240ms">
+        <div>
+          <p id="statDepartments" class="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">0</p>
+          <p class="text-xs text-zinc-400 mt-1">Bölüm</p>
+        </div>
+        <div>
+          <p id="statUniversities" class="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">0</p>
+          <p class="text-xs text-zinc-400 mt-1">Üniversite</p>
+        </div>
+        <div>
+          <p id="statCities" class="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">0</p>
+          <p class="text-xs text-zinc-400 mt-1">Şehir</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= SANA ÖZEL ÖNERİLER ======================= -->
+  <section id="recommendationsSection" class="hidden max-w-6xl mx-auto px-4 sm:px-6 pb-14">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h2 class="text-xl sm:text-2xl font-bold flex items-center gap-2">
+          <i class="fa-solid fa-sparkles text-indigo-500"></i>Sana Özel Öneriler
+        </h2>
+        <p class="text-sm text-zinc-400 mt-1">Sıralamana en yakın gerçek bölümler</p>
+      </div>
+    </div>
+    <div id="recommendationsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+  </section>
+
+  <!-- ======================= ARAMA & FİLTRELEME ======================= -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 pb-6">
+    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm p-4 sm:p-5">
+      <div class="flex flex-col lg:flex-row gap-3 lg:items-center">
+        <div class="flex-1 flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2.5">
+          <i class="fa-solid fa-magnifying-glass text-zinc-400"></i>
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Üniversite, bölüm veya şehir ara..."
+            class="w-full bg-transparent text-sm focus:outline-none placeholder:text-zinc-400"
+          >
+        </div>
+        <select id="sortSelect" class="bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="default">Varsayılan Sıralama</option>
+          <option value="nearest">Bana En Yakın</option>
+          <option value="rank_asc">Sıralama: Düşük → Yüksek</option>
+          <option value="rank_desc">Sıralama: Yüksek → Düşük</option>
+        </select>
+      </div>
+
+      <div id="scoreTypeFilters" class="mt-3 flex flex-wrap gap-2">
+        <button data-value="" class="score-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 transition-colors">Tümü</button>
+        <button data-value="SAY" class="score-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">SAY</button>
+        <button data-value="EA" class="score-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">EA</button>
+        <button data-value="SÖZ" class="score-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">SÖZ</button>
+        <button data-value="DİL" class="score-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">DİL</button>
+        <button data-value="TYT" class="score-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">TYT (Önlisans)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= SONUÇLAR ======================= -->
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
+    <p id="resultsInfo" class="mb-4 text-sm text-zinc-400 font-medium"></p>
+    <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="emptyState" class="hidden text-center py-20 text-zinc-400">
+      <i class="fa-solid fa-folder-open text-4xl mb-3"></i>
+      <p>Aramanla eşleşen bir bölüm bulunamadı.</p>
+    </div>
+  </main>
+
+  <footer class="border-t border-zinc-200 dark:border-zinc-800 py-8 text-center text-xs text-zinc-400">
+    Veriler YÖK Atlas kaynaklıdır · 2026 tahminleri istatistiksel bir modelle üretilir, resmi sonuç yerine geçmez.
+  </footer>
+
+  <!-- ======================= DETAY & YORUM MODAL'I ======================= -->
+  <div id="detailModal" class="hidden fixed inset-0 z-50">
+    <div id="modalBackdrop" class="absolute inset-0 bg-zinc-950/60 backdrop-blur-sm opacity-0 transition-opacity duration-300" onclick="closeDetailModal()"></div>
+    <div class="relative h-full flex items-center justify-center p-4">
+      <div id="modalPanel" class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] overflow-y-auto opacity-0 scale-95 transition-all duration-300">
+        <div id="detailModalContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= TERCİH LİSTESİ DRAWER ======================= -->
+  <div id="prefBackdrop" class="hidden fixed inset-0 bg-zinc-950/50 backdrop-blur-sm z-40 opacity-0 transition-opacity duration-300" onclick="togglePrefDrawer()"></div>
+  <div id="prefDrawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[26rem] bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col translate-x-full transition-transform duration-300">
+    <div class="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-zinc-800">
+      <h3 id="prefDrawerTitle" class="font-bold text-zinc-800 dark:text-zinc-100">Tercih Listem (0)</h3>
+      <button onclick="togglePrefDrawer()" class="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="p-5 border-b border-zinc-100 dark:border-zinc-800 space-y-2">
+      <label for="userRankInput" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">YKS Başarı Sıralaman</label>
+      <input
+        id="userRankInput"
+        type="number"
+        min="1"
+        placeholder="Örn: 65000"
+        class="w-full bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      >
+      <button
+        id="calculateBtn"
+        onclick="calculateChances()"
+        class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl py-2.5 font-semibold text-sm active:scale-[0.98] transition-all shadow-lg shadow-indigo-600/20"
+      >
+        <i class="fa-solid fa-calculator mr-1"></i>İhtimalleri Hesapla
+      </button>
+    </div>
+
+    <div id="prefList" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
+  </div>
+
+  <!-- ======================= TOAST BİLDİRİMLERİ ======================= -->
+  <div id="toastContainer" class="fixed top-4 inset-x-4 sm:inset-x-auto sm:right-4 z-[60] flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    // ==========================================================================
+    // UYGULAMA DURUMU (STATE)
+    // ==========================================================================
+    const state = {
+      departments: [],
+      recommendations: [],
+      searchQuery: '',
+      activeScoreType: null,
+      sortMode: 'default', // 'default' | 'nearest' | 'rank_asc' | 'rank_desc'
+      preferenceList: [],
+      userRank: null,
+      charts: {}, // canvasId -> Chart.js örneği (yeniden çizmeden önce destroy edilir)
+    };
+
+    const RESULTS_LIMIT = 30;
+    const RECOMMENDATIONS_LIMIT = 8;
+
+    const SCORE_TYPE_STYLES = {
+      SAY: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400',
+      EA: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400',
+      'SÖZ': 'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400',
+      'DİL': 'bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-400',
+      TYT: 'bg-pink-50 dark:bg-pink-500/10 text-pink-700 dark:text-pink-400',
+    };
+
+    // ==========================================================================
+    // YARDIMCI FONKSİYONLAR
+    // ==========================================================================
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str ?? '';
+      return div.innerHTML;
+    }
+
+    function formatRank(value) {
+      return Number(value).toLocaleString('tr-TR');
+    }
+
+    function formatDate(isoString) {
+      const date = new Date(isoString);
+      return `${date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+
+    function debounce(fn, delay = 350) {
+      let timerId;
+      return (...args) => {
+        clearTimeout(timerId);
+        timerId = setTimeout(() => fn(...args), delay);
+      };
+    }
+
+    function isDarkMode() {
+      return document.documentElement.classList.contains('dark');
+    }
+
+    // predictor.py::calculate_winning_chance ile birebir aynı eşik mantığı (anlık önizleme için)
+    function computeChance(userRank, forecastMin, forecastMax) {
+      if (userRank < forecastMin) return { message: '%85 - %99 (Güvenli Liman)', color: 'GREEN' };
+      if (userRank <= forecastMax) return { message: '%40 - %70 (Sınırda / Muhtemel)', color: 'YELLOW' };
+      return { message: '%5 - %25 (Sürpriz / Zor)', color: 'RED' };
+    }
+
+    function trendBadge(trendStatus) {
+      const styles = {
+        'YÜKSELİŞ': { icon: 'fa-arrow-trend-up', cls: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+        'DÜŞÜŞ': { icon: 'fa-arrow-trend-down', cls: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' },
+        'SABİT': { icon: 'fa-minus', cls: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400' },
+      };
+      const s = styles[trendStatus] || styles['SABİT'];
+      return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold ${s.cls}"><i class="fa-solid ${s.icon}"></i>${trendStatus}</span>`;
+    }
+
+    function chanceBadge(chance) {
+      const styles = {
+        GREEN: { icon: 'fa-circle-check', cls: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30' },
+        YELLOW: { icon: 'fa-triangle-exclamation', cls: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30' },
+        RED: { icon: 'fa-circle-xmark', cls: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30' },
+      };
+      const s = styles[chance.color] || styles.YELLOW;
+      return `<div class="border rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-2 ${s.cls}"><i class="fa-solid ${s.icon}"></i>${escapeHtml(chance.message)}</div>`;
+    }
+
+    function chanceStripe(chance) {
+      const colors = { GREEN: 'bg-emerald-500', YELLOW: 'bg-amber-500', RED: 'bg-rose-500' };
+      return `<div class="absolute top-0 left-0 right-0 h-1 ${colors[chance.color] || colors.YELLOW}"></div>`;
+    }
+
+    function skeletonCards(count) {
+      return Array.from({ length: count }).map(() => `
+        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 flex flex-col gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl skeleton"></div>
+            <div class="flex-1 space-y-2">
+              <div class="h-3 w-3/4 rounded skeleton"></div>
+              <div class="h-3 w-1/2 rounded skeleton"></div>
+            </div>
+          </div>
+          <div class="h-14 rounded-lg skeleton"></div>
+          <div class="h-8 rounded-lg skeleton"></div>
+        </div>
+      `).join('');
+    }
+
+    // ==========================================================================
+    // TOAST BİLDİRİMLERİ (native alert() yerine)
+    // ==========================================================================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const styles = {
+        success: { icon: 'fa-circle-check', cls: 'border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-50/95 dark:bg-emerald-500/10' },
+        error: { icon: 'fa-circle-exclamation', cls: 'border-rose-500/30 text-rose-700 dark:text-rose-400 bg-rose-50/95 dark:bg-rose-500/10' },
+        info: { icon: 'fa-circle-info', cls: 'border-indigo-500/30 text-indigo-700 dark:text-indigo-400 bg-indigo-50/95 dark:bg-indigo-500/10' },
+      };
+      const s = styles[type] || styles.info;
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto flex items-center gap-2 border ${s.cls} rounded-xl px-4 py-3 shadow-lg text-sm font-medium backdrop-blur-md transition-all duration-300 opacity-0 -translate-y-2`;
+      toast.innerHTML = `<i class="fa-solid ${s.icon}"></i><span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('opacity-0', '-translate-y-2'));
+      setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    // ==========================================================================
+    // TEMA (KOYU/AÇIK MOD)
+    // ==========================================================================
+    function initTheme() {
+      updateThemeIcon(isDarkMode());
+    }
+
+    function toggleTheme() {
+      const dark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('yks_theme', dark ? 'dark' : 'light');
+      updateThemeIcon(dark);
+      // Grafiklerin eksen/metin renkleri temaya göre değiştiği için yeniden çizilir
+      renderResultsGrid();
+      renderRecommendations();
+      if (state.currentDetailId) refreshDetailChart();
+    }
+
+    function updateThemeIcon(dark) {
+      document.getElementById('themeIcon').className = dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    }
+
+    // ==========================================================================
+    // SIRALAMA (RANK) ONBOARDING
+    // ==========================================================================
+    function loadUserRank() {
+      const saved = localStorage.getItem('yks_user_rank');
+      if (saved) state.userRank = parseInt(saved, 10);
+    }
+
+    function persistUserRank(rank) {
+      state.userRank = rank;
+      localStorage.setItem('yks_user_rank', String(rank));
+    }
+
+    function applyRankUI() {
+      if (!state.userRank) return;
+      const pill = document.getElementById('rankPill');
+      pill.classList.remove('hidden');
+      pill.classList.add('inline-flex');
+      pill.querySelector('span').textContent = formatRank(state.userRank);
+
+      document.getElementById('heroRankInput').value = state.userRank;
+      const drawerInput = document.getElementById('userRankInput');
+      if (drawerInput && !drawerInput.value) drawerInput.value = state.userRank;
+
+      document.getElementById('recommendationsSection').classList.remove('hidden');
+    }
+
+    function submitRank(event) {
+      event.preventDefault();
+      const rank = parseInt(document.getElementById('heroRankInput').value, 10);
+      if (!rank || rank <= 0) {
+        showToast('Lütfen geçerli bir sıralama gir.', 'error');
+        return;
+      }
+      persistUserRank(rank);
+      applyRankUI();
+      generateRecommendations();
+      renderResultsGrid();
+      showToast('Analiz hazır! Sana özel önerilerin aşağıda.', 'success');
+      setTimeout(() => {
+        document.getElementById('recommendationsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    }
+
+    function scrollToRankForm() {
+      document.getElementById('heroSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document.getElementById('heroRankInput').focus();
+    }
+
+    // ==========================================================================
+    // İSTATİSTİK SAYAÇLARI
+    // ==========================================================================
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        if (!res.ok) throw new Error('İstatistikler alınamadı');
+        const data = await res.json();
+        animateCounter('statDepartments', data.total_departments);
+        animateCounter('statUniversities', data.total_universities);
+        animateCounter('statCities', data.total_cities);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    function animateCounter(elementId, target) {
+      const el = document.getElementById(elementId);
+      const duration = 1200;
+      const start = performance.now();
+      function tick(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.round(eased * target).toLocaleString('tr-TR');
+        if (progress < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // ==========================================================================
+    // MİNİ SPARKLINE GRAFİĞİ (kartlarda 2023-2024-2025 trendi)
+    // ==========================================================================
+    function renderSparkline(dept, section) {
+      const canvasId = `spark-${section}-${dept.id}`;
+      const canvas = document.getElementById(canvasId);
+      if (!canvas || typeof Chart === 'undefined') return;
+      if (state.charts[canvasId]) state.charts[canvasId].destroy();
+
+      const lineColor = dept.trend_status === 'DÜŞÜŞ' ? '#f43f5e' : dept.trend_status === 'SABİT' ? '#a1a1aa' : '#6366f1';
+
+      state.charts[canvasId] = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: ['2023', '2024', '2025'],
+          datasets: [{
+            data: [dept.rank_2023, dept.rank_2024, dept.rank_2025],
+            borderColor: lineColor,
+            backgroundColor: lineColor + '1f',
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 3,
+            fill: true,
+            tension: 0.35,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 400 },
+          scales: { x: { display: false }, y: { display: false, reverse: true } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              displayColors: false,
+              callbacks: {
+                title: (items) => items[0].label,
+                label: (item) => `Sıralama: ${formatRank(item.raw)}`,
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // ==========================================================================
+    // BÖLÜM KARTI ŞABLONU (öneriler ve sonuç grid'i için ortak)
+    // ==========================================================================
+    function cardTemplate(dept, section) {
+      const inPreferenceList = state.preferenceList.some((p) => p.id === dept.id);
+      const scoreTypeClass = SCORE_TYPE_STYLES[dept.score_type] || 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300';
+      const chance = state.userRank ? computeChance(state.userRank, dept.forecast_min_rank, dept.forecast_max_rank) : null;
+      const initial = (dept.university_name.trim()[0] || '?').toUpperCase();
+
+      return `
+        <div class="relative overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 flex flex-col gap-3.5 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-slide-up">
+          ${chance ? chanceStripe(chance) : ''}
+
+          <div class="flex items-start gap-3">
+            <div class="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-indigo-500/20">
+              ${escapeHtml(initial)}
+            </div>
+            <div class="min-w-0 flex-1">
+              <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide ${scoreTypeClass}">${dept.score_type}</span>
+              <h3 class="text-[15px] font-semibold text-zinc-900 dark:text-zinc-50 mt-1 leading-tight truncate" title="${escapeHtml(dept.university_name)}">${escapeHtml(dept.university_name)}</h3>
+              <p class="text-indigo-600 dark:text-indigo-400 text-sm font-medium truncate" title="${escapeHtml(dept.department_name)}">${escapeHtml(dept.department_name)}</p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <span><i class="fa-solid fa-location-dot mr-1 text-zinc-400 dark:text-zinc-500"></i>${escapeHtml(dept.city)}</span>
+            <span><i class="fa-solid fa-users mr-1 text-zinc-400 dark:text-zinc-500"></i>${dept.quota_2025} kontenjan</span>
+          </div>
+
+          <div class="h-14 -mx-1">
+            <canvas id="spark-${section}-${dept.id}"></canvas>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>${formatRank(dept.forecast_min_rank)}-${formatRank(dept.forecast_max_rank)}
+            </span>
+            ${trendBadge(dept.trend_status)}
+          </div>
+
+          ${chance ? chanceBadge(chance) : ''}
+
+          <div class="flex gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            <button onclick="openDetailModal(${dept.id})" class="flex-1 text-xs font-semibold rounded-lg py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-95 transition-all">
+              <i class="fa-solid fa-circle-info mr-1"></i>Detay
+            </button>
+            <button onclick="togglePreference(${dept.id})" class="flex-1 text-xs font-semibold rounded-lg py-2 active:scale-95 transition-all ${inPreferenceList ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-indigo-600 text-white hover:bg-indigo-700'}">
+              <i class="fa-solid ${inPreferenceList ? 'fa-check' : 'fa-plus'} mr-1"></i>${inPreferenceList ? 'Listede' : 'Listeye Ekle'}
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================================================
+    // SANA ÖZEL ÖNERİLER (near_rank ile backend'de hesaplanır)
+    // ==========================================================================
+    async function generateRecommendations() {
+      if (!state.userRank) return;
+      const grid = document.getElementById('recommendationsGrid');
+      grid.innerHTML = skeletonCards(4);
+
+      try {
+        const res = await fetch(`/api/departments?near_rank=${state.userRank}&limit=${RECOMMENDATIONS_LIMIT}`);
+        if (!res.ok) throw new Error('Öneriler alınamadı');
+        state.recommendations = await res.json();
+      } catch (error) {
+        console.error(error);
+        state.recommendations = [];
+      }
+      renderRecommendations();
+    }
+
+    function renderRecommendations() {
+      const grid = document.getElementById('recommendationsGrid');
+      if (state.recommendations.length === 0) {
+        grid.innerHTML = `<p class="col-span-full text-center text-zinc-400 py-8">Öneri bulunamadı.</p>`;
+        return;
+      }
+      grid.innerHTML = state.recommendations.map((d) => cardTemplate(d, 'rec')).join('');
+      state.recommendations.forEach((d) => renderSparkline(d, 'rec'));
+    }
+
+    // ==========================================================================
+    // ARAMA / FİLTRELEME / SIRALAMA
+    // ==========================================================================
+    function getSortedDepartments() {
+      const list = [...state.departments];
+      if (state.sortMode === 'rank_asc') list.sort((a, b) => a.rank_2025 - b.rank_2025);
+      else if (state.sortMode === 'rank_desc') list.sort((a, b) => b.rank_2025 - a.rank_2025);
+      return list; // 'default' ve 'nearest' zaten backend'den doğru sırayla gelir
+    }
+
+    async function fetchDepartments() {
+      const grid = document.getElementById('resultsGrid');
+      grid.innerHTML = skeletonCards(6);
+      document.getElementById('emptyState').classList.add('hidden');
+
+      const params = new URLSearchParams();
+      if (state.searchQuery) params.set('query', state.searchQuery);
+      if (state.activeScoreType) params.set('score_type', state.activeScoreType);
+      if (state.sortMode === 'nearest' && state.userRank) params.set('near_rank', state.userRank);
+      params.set('limit', String(RESULTS_LIMIT));
+
+      try {
+        const res = await fetch(`/api/departments?${params.toString()}`);
+        if (!res.ok) throw new Error('Bölümler alınamadı');
+        state.departments = await res.json();
+      } catch (error) {
+        console.error(error);
+        state.departments = [];
+        showToast('Bölümler yüklenirken bir hata oluştu.', 'error');
+      }
+      renderResultsGrid();
+    }
+
+    function renderResultsGrid() {
+      const grid = document.getElementById('resultsGrid');
+      const info = document.getElementById('resultsInfo');
+      const empty = document.getElementById('emptyState');
+      const list = getSortedDepartments();
+
+      const queryText = state.searchQuery ? ` · "${escapeHtml(state.searchQuery)}"` : '';
+      info.innerHTML = `${list.length} sonuç${queryText}`;
+
+      if (list.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      grid.innerHTML = list.map((d) => cardTemplate(d, 'res')).join('');
+      list.forEach((d) => renderSparkline(d, 'res'));
+    }
+
+    function setupScoreTypeFilters() {
+      const buttons = document.querySelectorAll('.score-filter-btn');
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          state.activeScoreType = button.dataset.value || null;
+          buttons.forEach((b) => {
+            const active = b === button;
+            b.classList.toggle('bg-zinc-900', active);
+            b.classList.toggle('dark:bg-white', active);
+            b.classList.toggle('text-white', active);
+            b.classList.toggle('dark:text-zinc-900', active);
+            b.classList.toggle('bg-zinc-100', !active);
+            b.classList.toggle('dark:bg-zinc-800', !active);
+            b.classList.toggle('text-zinc-500', !active);
+            b.classList.toggle('dark:text-zinc-400', !active);
+          });
+          fetchDepartments();
+        });
+      });
+    }
+
+    function onSortChange(value) {
+      if (value === 'nearest' && !state.userRank) {
+        showToast('Bu sıralama için önce YKS sıralamanı girmelisin.', 'error');
+        document.getElementById('sortSelect').value = state.sortMode;
+        return;
+      }
+      const needsRefetch = value === 'nearest' || state.sortMode === 'nearest';
+      state.sortMode = value;
+      if (needsRefetch) fetchDepartments();
+      else renderResultsGrid();
+    }
+
+    // ==========================================================================
+    // BÖLÜM DETAY & YORUM MODAL'I
+    // ==========================================================================
+    async function openDetailModal(deptId) {
+      state.currentDetailId = deptId;
+      const modal = document.getElementById('detailModal');
+      modal.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+      requestAnimationFrame(() => {
+        document.getElementById('modalBackdrop').classList.remove('opacity-0');
+        document.getElementById('modalPanel').classList.remove('opacity-0', 'scale-95');
+      });
+
+      document.getElementById('detailModalContent').innerHTML = `
+        <div class="p-16 flex justify-center text-zinc-300 dark:text-zinc-600">
+          <i class="fa-solid fa-spinner fa-spin text-3xl"></i>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(`/api/departments/${deptId}`);
+        if (!res.ok) throw new Error('Bölüm detayı alınamadı');
+        const data = await res.json();
+        state.currentDetailData = data;
+        renderDetailModal(data);
+      } catch (error) {
+        console.error(error);
+        document.getElementById('detailModalContent').innerHTML = `
+          <div class="p-16 text-center text-rose-500">Bölüm bilgileri yüklenirken bir hata oluştu.</div>
+        `;
+      }
+    }
+
+    function closeDetailModal() {
+      document.getElementById('modalBackdrop').classList.add('opacity-0');
+      document.getElementById('modalPanel').classList.add('opacity-0', 'scale-95');
+      document.body.classList.remove('overflow-hidden');
+      setTimeout(() => {
+        document.getElementById('detailModal').classList.add('hidden');
+        state.currentDetailId = null;
+      }, 250);
+    }
+
+    function renderDetailModal(data) {
+      const chance = state.userRank ? computeChance(state.userRank, data.forecast_min_rank, data.forecast_max_rank) : null;
+      const initial = (data.university_name.trim()[0] || '?').toUpperCase();
+
+      document.getElementById('detailModalContent').innerHTML = `
+        <div class="p-6 sm:p-8">
+          <div class="flex justify-between items-start gap-4 mb-6">
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xl shadow-md">
+                ${escapeHtml(initial)}
+              </div>
+              <div class="min-w-0">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-zinc-50 leading-tight">${escapeHtml(data.university_name)}</h2>
+                <p class="text-indigo-600 dark:text-indigo-400 font-medium">${escapeHtml(data.department_name)}</p>
+                <p class="text-xs text-zinc-400 mt-1">${escapeHtml(data.faculty_name)} · ${escapeHtml(data.city)} · ${escapeHtml(data.education_type)}</p>
+              </div>
+            </div>
+            <button onclick="closeDetailModal()" class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div class="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-3 text-center">
+              <p class="text-[11px] text-zinc-400 mb-1">2023</p>
+              <p class="font-bold text-zinc-800 dark:text-zinc-100 text-sm">${formatRank(data.rank_2023)}</p>
+            </div>
+            <div class="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-3 text-center">
+              <p class="text-[11px] text-zinc-400 mb-1">2024</p>
+              <p class="font-bold text-zinc-800 dark:text-zinc-100 text-sm">${formatRank(data.rank_2024)}</p>
+            </div>
+            <div class="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-3 text-center">
+              <p class="text-[11px] text-zinc-400 mb-1">2025</p>
+              <p class="font-bold text-zinc-800 dark:text-zinc-100 text-sm">${formatRank(data.rank_2025)}</p>
+            </div>
+          </div>
+
+          <div class="h-52 my-4">
+            <canvas id="detailChart"></canvas>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>2026 Tahmin: ${formatRank(data.forecast_min_rank)} - ${formatRank(data.forecast_max_rank)}
+            </span>
+            ${trendBadge(data.trend_status)}
+          </div>
+
+          ${chance ? `<div class="mb-6">${chanceBadge(chance)}</div>` : `
+            <button onclick="closeDetailModal(); scrollToRankForm();" class="mb-6 w-full text-xs font-semibold rounded-lg py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+              <i class="fa-solid fa-circle-info mr-1"></i>Kazanma ihtimalini görmek için sıralamanı gir
+            </button>
+          `}
+
+          <h3 class="font-semibold text-zinc-800 dark:text-zinc-100 mb-3 text-sm">
+            <i class="fa-solid fa-comments mr-1.5 text-zinc-400"></i>Yorumlar (${data.comments.length})
+          </h3>
+          <div id="commentsList" class="space-y-3 mb-4 max-h-56 overflow-y-auto pr-1">
+            ${renderCommentsList(data.comments)}
+          </div>
+
+          <form id="commentForm" class="space-y-2 bg-zinc-50 dark:bg-zinc-800/60 p-3 rounded-xl">
+            <input name="nickname" required maxlength="50" placeholder="Adın / Rumuz"
+              class="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <textarea name="content" required rows="2" placeholder="Bu bölüm hakkında yorumunu yaz..."
+              class="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-lg py-2 text-sm font-semibold transition-all">
+              <i class="fa-solid fa-paper-plane mr-1"></i>Yorum Ekle
+            </button>
+          </form>
+        </div>
+      `;
+
+      renderDetailChart(data);
+      document.getElementById('commentForm').addEventListener('submit', (event) => submitComment(event, data.id));
+    }
+
+    function refreshDetailChart() {
+      if (state.currentDetailData) renderDetailChart(state.currentDetailData);
+    }
+
+    // Gerçek sıralama + 2026 tahmin "konisi" (en iyi / en kötü ihtimal) grafiği
+    function renderDetailChart(data) {
+      const canvas = document.getElementById('detailChart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      if (state.charts.detail) state.charts.detail.destroy();
+
+      const dark = isDarkMode();
+      const gridColor = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+      const textColor = dark ? '#a1a1aa' : '#71717a';
+
+      state.charts.detail = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: ['2023', '2024', '2025', '2026 (Tahmin)'],
+          datasets: [
+            {
+              label: 'Gerçek Sıralama',
+              data: [data.rank_2023, data.rank_2024, data.rank_2025, null],
+              borderColor: '#6366f1',
+              backgroundColor: '#6366f11f',
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: '#6366f1',
+              tension: 0.3,
+            },
+            {
+              label: 'En İyi İhtimal',
+              data: [null, null, data.rank_2025, data.forecast_min_rank],
+              borderColor: '#10b981',
+              borderDash: [6, 4],
+              borderWidth: 2,
+              pointRadius: [0, 0, 0, 4],
+              pointBackgroundColor: '#10b981',
+              tension: 0,
+            },
+            {
+              label: 'En Kötü İhtimal',
+              data: [null, null, data.rank_2025, data.forecast_max_rank],
+              borderColor: '#f43f5e',
+              borderDash: [6, 4],
+              borderWidth: 2,
+              pointRadius: [0, 0, 0, 4],
+              pointBackgroundColor: '#f43f5e',
+              tension: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y: {
+              reverse: true,
+              grid: { color: gridColor },
+              ticks: { color: textColor, callback: (v) => formatRank(v) },
+            },
+            x: { grid: { display: false }, ticks: { color: textColor } },
+          },
+          plugins: {
+            legend: { position: 'bottom', labels: { color: textColor, boxWidth: 10, font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (item) => `${item.dataset.label}: ${item.raw !== null ? formatRank(item.raw) : '-'}`,
+              },
+            },
+          },
+        },
+      });
+    }
+
+    function renderCommentsList(comments) {
+      if (comments.length === 0) {
+        return `<p class="text-sm text-zinc-400 text-center py-6"><i class="fa-regular fa-comment-dots text-2xl mb-2 block"></i>Henüz yorum yok. İlk yorumu sen yaz!</p>`;
+      }
+      return comments.map((comment) => `
+        <div class="flex gap-3">
+          <div class="shrink-0 w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-600 dark:text-zinc-300">
+            ${escapeHtml((comment.nickname.trim()[0] || '?').toUpperCase())}
+          </div>
+          <div class="flex-1 bg-zinc-50 dark:bg-zinc-800/60 rounded-xl rounded-tl-none p-3">
+            <div class="flex justify-between items-center mb-1 gap-2">
+              <span class="font-semibold text-xs text-zinc-700 dark:text-zinc-200">${escapeHtml(comment.nickname)}</span>
+              <span class="text-[10px] text-zinc-400 shrink-0">${formatDate(comment.created_at)}</span>
+            </div>
+            <p class="text-sm text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap">${escapeHtml(comment.content)}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function submitComment(event, deptId) {
+      event.preventDefault();
+      const form = event.target;
+      const nickname = form.nickname.value.trim();
+      const content = form.content.value.trim();
+      if (!nickname || !content) return;
+
+      const submitButton = form.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      submitButton.classList.add('opacity-60');
+
+      try {
+        const res = await fetch(`/api/departments/${deptId}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nickname, content }),
+        });
+        if (!res.ok) throw new Error('Yorum eklenemedi');
+
+        const detailRes = await fetch(`/api/departments/${deptId}`);
+        const detailData = await detailRes.json();
+        state.currentDetailData = detailData;
+        renderDetailModal(detailData);
+        showToast('Yorumun eklendi!', 'success');
+      } catch (error) {
+        console.error(error);
+        showToast('Yorum eklenirken bir hata oluştu.', 'error');
+        submitButton.disabled = false;
+        submitButton.classList.remove('opacity-60');
+      }
+    }
+
+    // ==========================================================================
+    // TERCİH LİSTESİ & İHTİMAL HESAPLAYICI
+    // ==========================================================================
+    function loadPreferenceList() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('yks_preference_list') || '[]');
+        state.preferenceList = Array.isArray(saved) ? saved : [];
+      } catch {
+        state.preferenceList = [];
+      }
+    }
+
+    function persistPreferenceList() {
+      localStorage.setItem('yks_preference_list', JSON.stringify(state.preferenceList));
+    }
+
+    function togglePrefDrawer() {
+      const drawer = document.getElementById('prefDrawer');
+      const backdrop = document.getElementById('prefBackdrop');
+      const isOpen = !drawer.classList.contains('translate-x-full');
+      if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        backdrop.classList.add('opacity-0');
+        setTimeout(() => backdrop.classList.add('hidden'), 300);
+      } else {
+        backdrop.classList.remove('hidden');
+        requestAnimationFrame(() => backdrop.classList.remove('opacity-0'));
+        drawer.classList.remove('translate-x-full');
+      }
+    }
+
+    function togglePreference(deptId) {
+      const existingIndex = state.preferenceList.findIndex((p) => p.id === deptId);
+      if (existingIndex >= 0) {
+        state.preferenceList.splice(existingIndex, 1);
+      } else {
+        const dept = state.departments.find((d) => d.id === deptId) || state.recommendations.find((d) => d.id === deptId);
+        if (!dept) return;
+        state.preferenceList.push({ ...dept, chance_message: null, chance_color: null });
+        showToast(`"${dept.department_name}" listene eklendi.`, 'success');
+      }
+      persistPreferenceList();
+      renderResultsGrid();
+      renderRecommendations();
+      renderPreferenceDrawer();
+    }
+
+    function removeFromPreferenceList(deptId) {
+      state.preferenceList = state.preferenceList.filter((p) => p.id !== deptId);
+      persistPreferenceList();
+      renderResultsGrid();
+      renderRecommendations();
+      renderPreferenceDrawer();
+    }
+
+    function renderPreferenceDrawer() {
+      document.getElementById('prefCountBadge').textContent = state.preferenceList.length;
+      document.getElementById('prefDrawerTitle').textContent = `Tercih Listem (${state.preferenceList.length})`;
+
+      const list = document.getElementById('prefList');
+      if (state.preferenceList.length === 0) {
+        list.innerHTML = `
+          <div class="text-center py-12 text-zinc-400">
+            <i class="fa-regular fa-folder-open text-3xl mb-3 block"></i>
+            <p class="text-sm">Listende henüz bölüm yok.</p>
+            <p class="text-xs mt-1">Kartlardaki "Listeye Ekle" butonuyla ekleyebilirsin.</p>
+          </div>
+        `;
+        return;
+      }
+      list.innerHTML = state.preferenceList.map((dept, index) => `
+        <div class="border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 flex flex-col gap-2 animate-slide-up">
+          <div class="flex justify-between items-start gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold flex items-center justify-center">${index + 1}</span>
+              <div class="min-w-0">
+                <p class="font-semibold text-xs text-zinc-800 dark:text-zinc-100 truncate">${escapeHtml(dept.university_name)}</p>
+                <p class="text-[11px] text-indigo-600 dark:text-indigo-400 truncate">${escapeHtml(dept.department_name)}</p>
+              </div>
+            </div>
+            <button onclick="removeFromPreferenceList(${dept.id})" class="shrink-0 text-zinc-300 hover:text-rose-500 dark:text-zinc-600 dark:hover:text-rose-400 transition-colors">
+              <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+          </div>
+          ${dept.chance_color ? chanceBadge({ message: dept.chance_message, color: dept.chance_color }) : ''}
+        </div>
+      `).join('');
+    }
+
+    async function calculateChances() {
+      if (state.preferenceList.length === 0) {
+        showToast('Önce tercih listene bölüm eklemelisin.', 'error');
+        return;
+      }
+      const rank = parseInt(document.getElementById('userRankInput').value, 10) || state.userRank;
+      if (!rank || rank <= 0) {
+        showToast('Lütfen geçerli bir YKS sıralaması gir.', 'error');
+        return;
+      }
+      if (rank !== state.userRank) {
+        persistUserRank(rank);
+        applyRankUI();
+        generateRecommendations();
+        renderResultsGrid();
+      }
+
+      const button = document.getElementById('calculateBtn');
+      const originalHtml = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>Hesaplanıyor...`;
+
+      try {
+        const res = await fetch('/api/calculate-list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_rank: rank, department_ids: state.preferenceList.map((p) => p.id) }),
+        });
+        if (!res.ok) throw new Error('İhtimaller hesaplanamadı');
+        const results = await res.json();
+
+        results.forEach((result) => {
+          const item = state.preferenceList.find((p) => p.id === result.department_id);
+          if (item) {
+            item.chance_message = result.chance_message;
+            item.chance_color = result.chance_color;
+          }
+        });
+        persistPreferenceList();
+        renderPreferenceDrawer();
+        showToast('İhtimaller hesaplandı!', 'success');
+      } catch (error) {
+        console.error(error);
+        showToast('İhtimaller hesaplanırken bir hata oluştu.', 'error');
+      } finally {
+        button.disabled = false;
+        button.innerHTML = originalHtml;
+      }
+    }
+
+    // ==========================================================================
+    // BAŞLANGIÇ (INIT)
+    // ==========================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      loadUserRank();
+      loadPreferenceList();
+      applyRankUI();
+      loadStats();
+      setupScoreTypeFilters();
+      renderPreferenceDrawer();
+
+      const debouncedSearch = debounce(() => {
+        state.searchQuery = document.getElementById('searchInput').value.trim();
+        fetchDepartments();
+      }, 350);
+      document.getElementById('searchInput').addEventListener('input', debouncedSearch);
+      document.getElementById('sortSelect').addEventListener('change', (event) => onSortChange(event.target.value));
+      document.getElementById('heroRankForm').addEventListener('submit', submitRank);
+      document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
+
+      fetchDepartments();
+      if (state.userRank) generateRecommendations();
+    });
+  </script>
+</body>
+</html>
